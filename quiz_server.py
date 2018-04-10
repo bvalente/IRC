@@ -61,11 +61,11 @@ def addQuestion(quizName,questionst,answerst):
 
     if (text in line):
         return 'Question already exists'
-        
+
     if (3 <= len(respostas) <= 5 and integer < len(respostas)):
         write_file(name,text)
         return 'Created Question'
-
+    
     return 'ANSWERS: Wrong arguments'
 
 def newQuiz(fileName):
