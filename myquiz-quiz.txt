@@ -1,0 +1,2 @@
+What is my name?:Bernardo:not Bernardo:1
+What is my last name?:Bernardo:Valente:Folques:2
