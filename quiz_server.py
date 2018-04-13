@@ -65,7 +65,7 @@ def addQuestion(quizName,questionst,answerst):
     if (3 <= len(respostas) <= 5 and integer < len(respostas)):
         write_file(name,text)
         return 'Created Question'
-    
+
     return 'ANSWERS: Wrong arguments'
 
 def newQuiz(fileName):
@@ -114,7 +114,7 @@ def listOptions():
     str += 'NQ: newQuiz <quizName> \n'
     str += 'SQ: showQuiz <quizName>\n'
     str += 'LQ: listQuiz <quizName>\n'
-    str += 'ADDQ: addQuestion <quizName> <question> <answers(2-4)<Right option>>\n'
+    str += 'ADDQ: addQuestion <quizName> <question> <answers(2-4)<Right option>>\n (Question should be followed by answers, separated with :)'
     return str
 
 while True:
@@ -123,7 +123,12 @@ while True:
     print('Waiting for instruction')
     data = client.recv(MSG_SIZE)
     request = data.decode().split()
-
+    
+    if len(request) == 0:
+        msg = 'Enter "h" for help.'
+        msg_sent = msg.encode()
+        client.send(msg_sent)
+        break
 
     request_type = request[TYPE]
 
