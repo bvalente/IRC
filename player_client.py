@@ -12,7 +12,7 @@ EXIT
 '''
 
 #sockets communication parameters
-SERVER_PORT = 8060
+SERVER_PORT = 8090
 SERVER_IP   = '127.0.0.1'
 MSG_SIZE = 1024
 

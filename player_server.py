@@ -1,7 +1,8 @@
-import socket, glob, os, signal, sys, logging, threading
+import socket, glob, os, signal, sys, logging
 from pathlib import Path
-from threading import Thread
+from threading import Thread, Timer
 
+#Version 2
 '''
 Commands
 LOGIN       <name>
@@ -18,31 +19,72 @@ NULL = ''
 QUIZ_EXTENSION = '-quiz.txt'
 LOG_EXTENSION = '-log.txt'
 WAIT_TIME = 60.0
-BOOL = '.B'
-TIME = '.T'
+
 #sockets communication parameters
-SERVER_PORT = 8060
+SERVER_PORT = 8090
 MSG_SIZE = 1024
 
 #global variables
 sockets = []
 threads = []
-timeouts = {}
+clients = {}
 
-def login(message):
-    #return send, name
-    global timeouts
+class Client:
+    def __init__(self, name):
+        self._name = name
+        self._quiz = []
+        self._quizName = NULL
+        self._question = 0
+        self._timeout = False
+        self._timeThread = Timer(WAIT_TIME, timeout, name)
+
+    def getName(self):
+        return self._name
+    def getQuiz(self):
+        return self._quiz
+    def setQuiz(self, quiz):
+        self._quiz = quiz
+    def getQuizName(self):
+        return self._quizName
+    def setQuizName(self, quizName):
+        self._quizName = quizName
+    def getQuestion(self):
+        return self._question
+    def nextQuestion(self):
+        self._question += 1
+        return self._question
+    def resetQuiz(self):
+        self._quiz = []
+        self._quizName = NULL
+        self._question = 0
+    def getTimeout(self):
+        return self._timeout
+    def reachTimeout(self):
+        self._timeout = True
+    def stopTimer(self):
+        self._timeout = False
+        self._timeThread.cancel()
+    def startTimer(self):
+        self._timeThread = Timer(WAIT_TIME, timeout, self._name)
+        self._timeThread.start()
+
+def login(message, serverName):
     splitMsg = message.split(' ')
     if len(splitMsg) != 2:
         #wrong message
-        return invalidMessage(message), NULL
+        return invalidMessage(message), serverName
     else:
-        timeouts[splitMsg[1]+BOOL] = False
-        timeouts[splitMsg[1]+TIME] = threading.Timer(WAIT_TIME, timeout, splitMsg[1])
-        return "HELLO " + splitMsg[1] , splitMsg[1]
+        name = splitMsg[1]
+        if name in clients:
+            return "name already registered", serverName
+        elif serverName != NULL:
+            return "player "+ serverName + " already logged in", serverName
+        else:
+            #create new client
+            clients[name] = Client(name)
+            return "HELLO " + name , name
 
 def list():
-    #return send
     #read txt files to return the list of quizes
     list = NULL
     for file in glob.glob("*"+QUIZ_EXTENSION):
@@ -52,121 +94,115 @@ def list():
         list = "there are no quizes"
     return list
 
-def quizDo(name, quizName,  message): #load quiz to RAM
-    #return send, quiz, quizName
-    global timeouts
+def quizDo(name, message): #load quiz to RAM
     if(name == NULL):
-        return "please login first" , NULL, NULL
-    if(quizName != NULL):
-        return "already in a quiz, please finish it first", NULL, NULL
+        return "please login first"
+    player = clients[name]
+    if(player.getQuizName() != NULL or player.getQuiz() != []):
+        return "already in a quiz, please finish it first"
+
     splitMsg = message.split(' ')
     if len(splitMsg) != 2:
         #wrong message
-        return invalidMessage(message), NULL, NULL
+        return invalidMessage(message)
     else:
-        my_file = Path("./" + splitMsg[1] + QUIZ_EXTENSION)
+        quizName = splitMsg[1]
+        my_file = Path("./" + quizName + QUIZ_EXTENSION)
         if my_file.is_file():
-            f = open(splitMsg[1]+QUIZ_EXTENSION, "r")
+            f = open(quizName+QUIZ_EXTENSION, "r")
             file = []
             for line  in f:
                 file.append(line)
             f.close()
             if len(file) == 0:
-                return "empty file", NULL, NULL
+                return "empty file"
             else:
-                timeouts[name+BOOL] = False
-                timeouts[name+TIME] = threading.Timer(WAIT_TIME, timeout, name)
-                timeouts[name+TIME].start()
-                return prepareQuestion(file[0]), file, splitMsg[1]
+                player.startTimer()
+                player.setQuiz(file)
+                player.setQuizName(quizName)
+                return prepareQuestion(file[0])
         else:
-            return "no quiz named: " + splitMsg[1], NULL, NULL
+            return "no quiz named: " + quizName
 
-
-def answer(name, quizName, message, quiz, question):
-    #return send, question, quiz
-    global timeouts
+def answer(name, message):
+    if name == NULL:
+        return "please login first"
+    player = clients[name]
+    quizName = player.getQuizName()
+    quiz = player.getQuiz()
+    question = player.getQuestion()
     if (quizName == NULL):
-        return "no quiz selected", 0, NULL, NULL
+        return "no quiz selected"
+    #check message
+    splitMsg = message.split(" ")
+    if len(splitMsg) != 2:
+        return invalidMessage(message)
+    #get number
+    number = splitMsg[1].strip('\n')#remove \n
+    if number != '1' and number != '2' and number != '3' and number != '4':
+        return invalidMessage(message)
+
+    answer = quiz[question].split(":")[-1].rstrip()
+    if player.getTimeout() :
+        #reached timeout
+        player.stopTimer()
+        logAnswer(quizName, name, question, '0', '0')
+        r = "\nTimeout!\nCorrect answer: " + answer +'\n'
+    elif number == answer:
+        #correct answer
+        logAnswer(quizName, name, question, number , '1' )
+        r = "correct answer!" + '\n'
     else:
-        #check message
-        splitMsg = message.split(" ")
-        if len(splitMsg) != 2:
-            return invalidMessage(message), question, quiz, quizName
-        else:
-            #get number
-            number = splitMsg[1].rstrip()#remove \n
-            if number != '1' and number != '2' and number != '3' and number != '4':
-                return invalidMessage(message), question, quiz, quizName
+        #wrong answer
+        logAnswer(quizName, name, question, number , '0' )
+        r = "wrong answer, the right one is: " + message+ '\n'
+    player.stopTimer()
+    question = player.nextQuestion()
+    if question == len(quiz):
+        player.resetQuiz()
+        r = r +"End of quiz"
+    else:
+        player.startTimer()
+        r = r + prepareQuestion(quiz[question])
 
-            else:
+    return r
 
-                answer = quiz[question].split(":")[-1].rstrip()
-                if timeouts[name+BOOL] :
-                    #reached timeout
-                    timeouts[name+BOOL] = False
-                    logAnswer(quizName, name, question, '0', '0')
-                    r = "\nTimeout!\nCorrect answer: "+ answer
-                elif number == answer:
-                    #correct answer
-                    logAnswer(quizName, name, question, number , '1' )
-                    r = "correct answer!\n"
-                else:
-                    #wrong answer
-                    logAnswer(quizName, name, question, number , '0' )
-                    r = "wrong answer, the right one is: " + message + '\n'
-
-                question += 1 #next question
-                if question == len(quiz):
-                    question = 0
-                    quiz= NULL
-                    quizName = NULL
-                    r= r +"\nEnd of quiz"
-                else:
-                    timeouts[name+BOOL] = False
-                    timeouts[name+TIME] = threading.Timer(WAIT_TIME, timeout, name)
-                    timeouts[name+TIME].start() #restart timer
-                    r = r + prepareQuestion(quiz[question])
-
-                return r , question, quiz, quizName
-
-
-def skip(name, quizName, quiz, question):
-    #return send, question, quiz
-    global timeouts
-    timeouts[name+BOOL] = False
-    timeouts[name+TIME].cancel()
-    if (quiz == NULL):
-        return "no quiz selected", 0, quiz
+def skip(name):
+    if name == NULL:
+        return "please login first"
+    player = clients[name]
+    player.stopTimer()
+    quiz = player.getQuiz()
+    if (quiz == [] or player.getQuizName() == NULL):
+        return "no quiz selected"
     else:
         size = len(quiz)
+        question = player.getQuestion()
         answer =  quiz[question].split(":")[-1].rstrip()
-        showAnswer = "\ncorrect answer: "+ answer
-        logAnswer(quizName, name, question, '0' , '0' )
-        question += 1
+        showAnswer = "\nCorrect answer: "+ answer
+        logAnswer(player.getQuizName(), name, question, '0' , '0' )
+        question = player.nextQuestion()
         if question == size: #question is in index
-
-            r = showAnswer + "\nEnd of quiz" , 0 , NULL
+            player.resetQuiz()
+            return showAnswer + "\nEnd of quiz"
         else:
-            timeouts[name+TIME] = threading.Timer(WAIT_TIME, timeout, name)
-            timeouts[name+TIME].start()
-            send = prepareQuestion(quiz[question])
-            r = showAnswer + send, question, quiz
+            player.startTimer()
+            return showAnswer + prepareQuestion(quiz[question])
 
-        return r
+def quitQuiz(name):
+    if name == NULL:
+        return "please login first"
+    player = clients[name]
+    if(player.getQuizName() != NULL):
+        logAnswer(player.getQuizName(), name, player.getQuestion(), '0', '0')
+        player.stopTimer()
+        player.resetQuiz()
+        return "Quiz quit"
+    else:
+        return "Not in a quiz"
 
-def quitQuiz(name, quizName, quiz, question):
-    #return send, quiz, quizName, question
-    global timeouts
-    if(quizName != NULL):
-        logAnswer(quizName, name, question, '0', '0')
-        timeouts[name + TIME].cancel()
-    return "Quiz quit", NULL, NULL, 0
-
-
-def exit(name, quizName, quiz, question):
-    #return send, game
-    if(quizName != NULL):
-        logAnswer(quizName, name, question, '0', '0')
+def exit(name):
+    quitQuiz(name)
     return 'DIE', False
 
 def invalidMessage(message):
@@ -176,7 +212,6 @@ def logAnswer(quizName,name, question, answer, correct ):
     f = open(quizName + LOG_EXTENSION, 'a')
     f.write(name +':'+ str(question+1) +':'+ answer +':'+ correct + '\n')
     f.close()
-
 
 def prepareQuestion(message):
     splitMsg = message.split(":")
@@ -192,10 +227,9 @@ def prepareQuestion(message):
 def signalHandler(signal, frame):
     print("Signal catched")
     #close every socket
-    for client in sockets:
+    for sock in sockets:
         print("closing client socket")
-        client.shutdown(socket.SHUT_RDWR)
-        #client.close() #the thread closes the socket
+        sock.shutdown(socket.SHUT_RDWR)
     #close server socket
     print("closing server socket")
     server_sock.close()
@@ -208,22 +242,16 @@ def signalHandler(signal, frame):
     sys.exit(0)
 
 def timeout(name):
-    #I use a list because it is passed by reference
-    global timeouts
-    timeouts[name+BOOL] = True;
+    clients[name].reachTimeout()
 
-def client_thread(client, addr):
-    global timeouts
+def client_thread(sock, addr):
     name = NULL
-    quiz = NULL
-    quizName = NULL
-    question = 0 #line of the file
     game = True
 
     while game:
         try:
             #receive message
-            data = client.recv(MSG_SIZE)
+            data = sock.recv(MSG_SIZE)
             message = data.decode()
             print ("received message: " + '\'' + message + '\'')
 
@@ -231,55 +259,46 @@ def client_thread(client, addr):
             command = splitMsg[0]
             #switch
             if (command == 'LOGIN'):
-                send, name = login(message)
+                send, name = login(message, name)
             elif(command == 'LIST'):
                 send = list()
             elif(command == 'QUIZDO'):
-                send, quiz, quizName = quizDo(name,quizName, message)
+                send = quizDo(name, message)
             elif (command =='ANSWER'):
-                send, question, quiz, quizName = answer(name, quizName, message, quiz, question)
+                send = answer(name, message)
             elif (command =='SKIP'):
-                send, question, quiz = skip(name, quizName, quiz, question)
+                send = skip(name)
             elif (command == 'QUITQUIZ'):
-                send, quiz, quizName, question = quitQuiz(name, quizName, quiz)
+                send = quitQuiz(name)
             elif(command == 'EXIT'):
-                send, game = exit(name, quizName, quiz, question)
+                send, game = exit(name)
             else:
                 send = invalidMessage(message)
 
             #send message
             msg = send.encode()
-            client.send(msg)
+            sock.send(msg)
 
         except socket.error:
-
             print("socket error")
             game = False
-            break;#break the loop
+
         except Exception as err:
-            #print ("Unexpected error:", sys.exc_info()[0])
             logging.exception("message")
             game = False
-            break;#unnecessary
 
-
-    #client.shutdown(socket.SHUT_RDWR)
-    if ( name != NULL):
-        del timeouts[name+BOOL]
-        del timeouts[name+TIME]
+    del clients[name] #remove player from list
     print("client socket closed")
-    client.close()
-    sockets.remove(client)
+    sock.close()
+    sockets.remove(sock)
     print("end of thread")
-    #close only socket
     sys.exit(0)
 
 #main code
 
 #catch Ctrl+C signal
 signal.signal(signal.SIGINT, signalHandler)
-
-
+#create server socket
 server_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 server_sock.bind(('', SERVER_PORT))
 server_sock.listen(1)
@@ -287,18 +306,12 @@ print("Server started")
 
 while True:
 
-    (client, addr) = server_sock.accept()
+    (sock, addr) = server_sock.accept()
     print ('Connection address: ', addr)
-    sockets.append(client)
+    sockets.append(sock)
 
-    thread = Thread(target = client_thread, args = (client, addr))
-
+    thread = Thread(target = client_thread, args = (sock, addr))
     thread.start()
     threads.append(thread)
 
-    #break;#debug
-
-for thread in threads:
-    thread.join()
-#thread.join()
-#server_sock.close()
+print("Major error")
