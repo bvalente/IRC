@@ -155,7 +155,7 @@ def answer(name, message):
     else:
         #wrong answer
         logAnswer(quizName, name, question, number , '0' )
-        r = "wrong answer, the right one is: " + message+ '\n'
+        r = "wrong answer, the right one is: " + answer+ '\n'
     player.stopTimer()
     question = player.nextQuestion()
     if question == len(quiz):
@@ -286,8 +286,8 @@ def client_thread(sock, addr):
         except Exception as err:
             logging.exception("message")
             game = False
-
-    del clients[name] #remove player from list
+    if name != NULL:
+        del clients[name] #remove player from list
     print("client socket closed")
     sock.close()
     sockets.remove(sock)

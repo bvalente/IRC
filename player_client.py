@@ -43,7 +43,7 @@ def sendMessage( message ):
     #make sure
     while True:
         user_msg = input(message)
-        if (user_msg != '\n'):
+        if (isValid(user_msg)):
             break;
     client_msg = user_msg.encode()
     client_sock.send(client_msg)
