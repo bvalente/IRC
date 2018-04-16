@@ -61,10 +61,8 @@ def quiz_stats(quiz_name):
                     timeout+=1
 
                 if int(answer[2]) != 0:
-                    print answer[2]
                     if answer[1] not in questions:
                         questions[answer[1]] = [0,0,0,0]
-                    print int(answer[2])-1
                     questions[answer[1]][int(answer[2])-1]+=1
             st +='correct questions - ' + str(correct) + '\n' +'incorrect questions - ' + str(incorrect) + '\n' + 'timedout questions - ' + str(timeout) + '\n'
             for q in questions:
@@ -98,7 +96,7 @@ def player_stats(player_name):
                 incorrect = 0
                 for l in lines:
                     answer = l.split(":")
-                    print answer
+
                     if int(answer[2])==0 and answer[0] == player_name:
                         timeout+=1
 
@@ -108,12 +106,8 @@ def player_stats(player_name):
                     if int(answer[3]) == 0 and answer[0] == player_name:
                         incorrect+=1
             total = correct + incorrect + timeout
-            print 'total '+str(total)
-            print 'correct' +str(correct)
-            print 'incorrect' +str(incorrect)
-            print 'timedout' +str(timeout)
+
             if total != 0:
-                print'alsifvbh'
                 file = file.replace('-log.txt','')
                 st +='---in ' +str(file)+'---' + '\n' + 'total questions placed - ' + str(total) + '\n' + 'correct questions - ' + str(correct) + '\n' +'incorrect quastions - ' + str(incorrect) + '\n' + 'timedout questions - ' + str(timeout) + '\n'
 
