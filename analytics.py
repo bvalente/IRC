@@ -5,10 +5,10 @@ import select
 
 
 #sockets communication parameters
-SERVER_PORT = 12002
+SERVER_PORT = 12001
 SERVER_IP   = '127.0.0.1'
 MSG_SIZE = 1024
-
+NULL=''
 client_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #TCP socket
 client_sock.connect((SERVER_IP, SERVER_PORT))
 
@@ -18,13 +18,14 @@ while True:
         #send message
         print('Input message to server:')
         user_msg = sys.stdin.readline()
-        client_msg = user_msg.encode()
-        client_sock.send(client_msg)
+        if user_msg != NULL and user_msg != '\n' and user_msg != '\t':
+            client_msg = user_msg.encode()
+            client_sock.send(client_msg)
 
         #receive message
-        data = client_sock.recv(MSG_SIZE)
-        rcv_msg = data.decode()
-        print(rcv_msg)
+            data = client_sock.recv(MSG_SIZE)
+            rcv_msg = data.decode()
+            print(rcv_msg)
 
     except socket.error:
 

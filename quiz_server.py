@@ -137,7 +137,7 @@ while True:
         name = request[QUIZNAME]
         msg = newQuiz(name)
 
-    #Para adicionar uma questão a um dado quiz o input deve ser do genero:
+    #Para adicionar uma questao a um dado quiz o input deve ser do genero:
     # ADDQ quizName pergunta respostas:separadas:por:2pontos:3
     # 3 seria considerada a resposta certa.
     elif(request_type == 'ADDQ' and len(request) == 4):

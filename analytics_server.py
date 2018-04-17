@@ -3,7 +3,7 @@ import os.path
 import glob, os
 
 #sockets communication parameters
-SERVER_PORT = 12002
+SERVER_PORT = 12001
 MSG_SIZE = 1024
 TYPE = 0
 
@@ -27,11 +27,11 @@ def list_players():
     dirpath = os.getcwd()
     os.chdir(dirpath)
     str = 'List of players\n'
-    for file in glob.glob("*.txt"):
+    for file in glob.glob("*-log.txt"):
         with open(file) as f:
             lines = f.readlines()
             for l in lines:
-                splitted = l.split()
+                splitted = l.split(':')
                 n = splitted[0]
                 if str.find(n)==-1:
                     str += '- '+ n +'\n'
@@ -123,6 +123,7 @@ while True:
     print('Waiting for instruction')
     data = client.recv(MSG_SIZE)
     request = data.decode().split()
+
     request_type = request[TYPE]
 
 
