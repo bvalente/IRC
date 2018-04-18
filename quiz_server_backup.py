@@ -2,6 +2,8 @@ import socket
 import os.path
 import glob, os
 
+### addQuestion not totally implemented ####
+
 #sockets communication parameters
 SERVER_PORT = 12002
 MSG_SIZE = 1024
@@ -27,6 +29,7 @@ def write_file(quizName, text):
     file = open(quizName, 'a')
     file.write(text)
     file.close()
+
 def file_exists(fileName):
     name = fileName + QUIZEXTENSION
     try:
@@ -37,36 +40,109 @@ def file_exists(fileName):
         file = open(name, 'w')
         file.close()
         return True
+def sendMessage(text):
+    if text != '':
+        msg = text
+    else:
+        print('else')
+        msg = 'Message is empty'
+    msg_sent = msg.encode()
+    client.send(msg_sent)
 
+def rcvMessage():
+    data = client.recv(MSG_SIZE)
+    msg_rcv = data.decode()
+    msg_rcv = msg_rcv.strip('\n')
+    return msg_rcv
 
-def addQuestion(quizName,questionst,answerst):
-    respostas = answerst.split(':')
-    i = respostas[-1]
-
+def isInt(n):
     try:
         int(i)
-        integer = int(i)
+    except:
+        return False
+    return True
 
-    except ValueError:
-        return 'ANSWERS: Last element has to be an integer'
+def addQuestion(quizName):
 
-
-    text = questionst + ':' + answerst + '\n'
     name = quizName + QUIZEXTENSION
     try:
+        print('OPENED')
         with open(name) as f:
             line = f.readlines()
+            f.close()
     except IOError:
+        print('ierror')
         return 'Quiz not registered'
 
-    if (text in line):
-        return 'Question already exists'
+    print('trying to send')
+    sendMessage('What is the question you would like to add?')
 
-    if (3 <= len(respostas) <= 5 and integer < len(respostas)):
-        write_file(name,text)
-        return 'Created Question'
+    data = rcvMessage()
 
-    return 'ANSWERS: Wrong arguments'
+    emptyString = False
+
+    if len(data)==0:
+        print('UUU')
+        emptyString = True
+
+    while emptyString:
+
+        sendMessage('Choose another question')
+        data = rcvMessage()
+        if len(data) != 0:
+            print('accepted format')
+            break
+
+    data.strip('\n')
+
+    if data in line:
+        print('QUESTION EXISTS')
+        return 'Question already exists' #nothings written
+
+    else:
+        #escrever a pergunta
+        f = open(name, 'a')
+        if len(line) == 0:
+            f.write(data + ':')
+        else:
+            f.write('\n' + data + ':')
+        f.close()
+
+        sendMessage('Question registered. Add an answer:')
+
+        f = open(name, 'a')
+
+        i = 0
+        var = True
+        while var: #max 5 iterations and
+            print('lixo')
+            answer = rcvMessage()
+
+            if i < 4:
+
+                if len(answer) == 0:
+                    sendMessage('Empty answer entered, try again')
+                    i -= 1
+                    continue
+
+                elif len(answer) > 0:
+                    f.write(answer + ':')
+                    if (i >= 2):
+                        new = '(last argument is the number of the correct Answer)'
+                    else:
+                        new = ''
+                    sendMessage('Add another answer:' + new)
+
+                elif isInt(answer) and i >= 2:
+                    print('here')
+                    f.write(answer + '\n')
+                    return 'Question added'
+            else:
+                var = False
+            print(i)
+            i += 1
+        f.close()
+    return 'Done'
 
 def newQuiz(fileName):
     if (file_exists(fileName)):
@@ -89,7 +165,6 @@ def listQuiz():
     str = str.replace(QUIZEXTENSION, "")
 
     return str
-
 
 def showQuiz(quizName):
     str = 'This is the ' + quizName + ' quiz.\n'
@@ -114,7 +189,7 @@ def listOptions():
     str += 'NQ: newQuiz <quizName> \n'
     str += 'SQ: showQuiz <quizName>\n'
     str += 'LQ: listQuiz <quizName>\n'
-    str += 'ADDQ: addQuestion <quizName> <question> <answers(2-4)<Right option>>\n (Question should be followed by answers, separated with :)'
+    str += 'ADDQ: addQuestion <quizName> <question> <answers(2-4) + <Right option>>'
     return str
 
 while True:
@@ -137,20 +212,15 @@ while True:
         name = request[QUIZNAME]
         msg = newQuiz(name)
 
-    #Para adicionar uma questao a um dado quiz o input deve ser do genero:
-    # ADDQ quizName pergunta respostas:separadas:por:2pontos:3
-    # 3 seria considerada a resposta certa.
-    elif(request_type == 'ADDQ' and len(request) == 4):
+
+    elif(request_type == 'ADDQ' and len(request) == 2):
         name = request[QUIZNAME]
-        question = request[QUESTION]
-        answers = request[ANSWERS]
-
         try:
-
-            msg = addQuestion(name,question,answers)
-
+            msg = addQuestion(name)
         except:
-            msg = 'Wrong arguments'
+            print('Erro, except')
+            msg = 'erro'
+
 
     elif (request_type == 'LQ' and len(request) == 1):
         msg = listQuiz()
@@ -168,6 +238,6 @@ while True:
     msg_sent = msg.encode()
     client.send(msg_sent)
 
-server_socket.close()
+server_sock.close()
 
     #send message to client
