@@ -21,7 +21,7 @@ LOG_EXTENSION = '-log.txt'
 WAIT_TIME = 60.0
 
 #sockets communication parameters
-SERVER_PORT = 8090
+SERVER_PORT = 8050
 MSG_SIZE = 1024
 
 #global variables
@@ -65,7 +65,8 @@ class Client:
         self._timeout = False
         self._timeThread.cancel()
     def startTimer(self):
-        self._timeThread = Timer(WAIT_TIME, timeout, self._name)
+        self._timeThread = Timer(WAIT_TIME, timeout, [self._name])
+        #print("name: " + self._name)
         self._timeThread.start()
 
 def login(message, serverName):
